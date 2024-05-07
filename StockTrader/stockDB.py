@@ -648,25 +648,34 @@ class App(customtkinter.CTk):
 
 
     #Function for logging in
+    
     def login_button_click(self):
+        #Initialize window
         dialog = customtkinter.CTkInputDialog(text="Username:", title="Login Window")
         username = dialog.get_input()
         dialog = customtkinter.CTkInputDialog(text="Password:", title="Login Window")
         password = dialog.get_input()
+
+        #Check database for inputed username and password
         mycursor.execute("SELECT userID FROM users WHERE userName = %s AND password = %s", (username,password))
         id = str(mycursor.fetchone())
+
+        #id is set to none if the user is not in the database
         if id != "None":
-            self.user_ID = int(id[1:-2])
-            self.login = True
+            self.user_ID = int(id[1:-2]) #Remove sql formating and convert back to int
+            self.login = True #Let the class know that the user is now logged in!
+            
             self.login_frame.configure(label_text = f"Welcome {username}")
-            #Assuming Successfull Login
             self.login_prompt_button.configure(text="Login As Another User")
-            #Updating position numbers
+            #Updating position numbers and all data labels
             self.update_positions()
+            
         else:
-            messagebox.showerror("Error", "This user does not exist.")
+            #Pop up window if the credentials are invalid / non existent 
+            messagebox.showerror("Error", "Invalid Credentials.")
             
 
+    #Function for creating a new user account
     def signUp_button_click(self):
         # Get username and password from user input dialogs
         dialog = customtkinter.CTkInputDialog(text="Create a Username:", title="Sign Up Window")
@@ -677,31 +686,34 @@ class App(customtkinter.CTk):
         mycursor.execute("SELECT * FROM Users WHERE userName = %s", (username,))
         existing_user = mycursor.fetchone()
 
+        #Make sure the username does not already exists
         if existing_user:
             messagebox.showerror("Error", "username already exists.")
             return
         userID = random.randint(10000, 99999)
+        insertUser(mycursor,userID,str(username),str(password))
 
-        #Can use insert user function
-        sql = "INSERT INTO Users (userID, userName, password, amount, buying_power) VALUES (%s, %s, %s, %s, %s)"
-        val = (userID, username, password, 0, 25000)
-        mycursor.execute(sql, val)
-        mydb.commit()  
+        #Automatically prompt for login after successfull login
         self.login_button_click(self)
                         
 
+    #Function to update all stock and database data
     def update_positions(self):
-
+        #Recieve per-position PnL and Overall PnL
         positionPnL, total_open_PnL = profitNLoss(mycursor,self.user_ID)
+
+        #Update text for all individual position updates
         text=''
         for item in positionPnL:
             text += f"{item}\n\n"
-
         self.open_PnL_Label.configure(text = f"{text}")
-        num = totalValue(mycursor,self.user_ID)
-        num = "{:.2f}".format(round(num,2))
-        self.user_total_label.configure(text = f"Account Value: ${num}")
 
+        #Set label for total account value
+        totAccWorth = totalValue(mycursor,self.user_ID)
+        totAccWorth = "{:.2f}".format(round(totAccWorth,2))
+        self.user_total_label.configure(text = f"Account Value: ${totAccWorth}")
+
+        #Grab updated amount (After running profitNLoss() ) and set to label
         mycursor.execute("SELECT amount from users WHERE userID = %s", (self.user_ID,))
         amount = str(mycursor.fetchone())
         amount = str(amount[1:-2])
@@ -709,30 +721,39 @@ class App(customtkinter.CTk):
         val = "{:.2f}".format(val)
         self.user_position_label.configure(text = f"Market Value: ${val}")
 
+        #Update buying power as well
         mycursor.execute("SELECT buying_power from users WHERE userID = %s", (self.user_ID,))
         self.buyingP = str(mycursor.fetchone())
         self.buyingP = str(self.buyingP[1:-2])
         val = round(float(self.buyingP),2)
         val = "{:.2f}".format(val)
         self.user_buyingP_label.configure(text = f"Buying Power: ${val}")
+
+        #Format and label updating for acive position information
         sql = ("SELECT * FROM positions WHERE userID = %s")
         mycursor.execute(sql,(self.user_ID,))
         items = mycursor.fetchall()
+        
+        #Check and see if there are active positions
         if not items:
-            print("No Active Positionsn\n")
+            self.positions_label.configure(text=f"No Active Positions")
             return
-        #Format = (214, 'aapl', 183.38, 8, 70900)
+            
+        #Format of items[] = (214, 'aapl', 183.38, 8, 70900)
         positions= ''
+        
         for row in items:
-    
             symbol = str(row[1])
             unRoundPOS = round(float(row[2]),2)
             POS = "{:.2f}".format(unRoundPOS)
-            
             positions += f"{symbol.upper()}:  {row[3]} Shares @ POS ${POS}\n\n"
+            
+        #Set for position data share count and updated POS
         self.positions_label.configure(text=f"{positions}")
 
-        acctPNL = round(float(num)-25000,2)
+        #Get life time account PnL and set to label
+        acctPNL = round(float(totAccWorth)-25000,2)
+        
         if acctPNL>=0:
             acctPNL = "{:.2f}".format(acctPNL)
             self.accountPNL_life.configure(text=f"\n\n Life Time P&L = $+{acctPNL}", text_color="green", font=customtkinter.CTkFont(size=16, weight="bold"))
@@ -740,6 +761,7 @@ class App(customtkinter.CTk):
             acctPNL = "{:.2f}".format(acctPNL)
             self.accountPNL_life.configure(text=f"\n\n Life Time P&L = ${acctPNL}", text_color="red", font=customtkinter.CTkFont(size=16, weight="bold"))
 
+        #Get current total open PnL and set to label
         if total_open_PnL>=0:
             total_open_PnL = "{:.2f}".format(total_open_PnL)
             self.accountPNL_open.configure(text=f"\n\n Open P&L = $+{total_open_PnL}", text_color="green", font=customtkinter.CTkFont(size=16, weight="bold"))
@@ -748,21 +770,39 @@ class App(customtkinter.CTk):
             self.accountPNL_open.configure(text=f"\n\n Open P&L = ${total_open_PnL}", text_color="red", font=customtkinter.CTkFont(size=16, weight="bold"))
 
 
-
+    
+    #Stock count button plus click handling
+    
     def plus_button_event(self):
+        #Stock count variable for amount to buy / sell updated
         self.stockCount+=1
+        #Grab buying power
         buyingPleft = float(self.buyingP)
+        #Buying power left after purchasing given number of stocks
         buyingPleft = round((buyingPleft - (float(self.searchPrice) * self.stockCount)),2)
+
+        #Prevent overbuying
+        if buyingPleft < 0:
+            self.stockCount--
+            return #break
+        #Format Buying Power Left Label
         buyingPleft = "{:.2f}".format(buyingPleft)
         self.buyingP_left_number.configure(text = f"Buying Power: ${round(float(buyingPleft),2)}")
-        marketValue = round((float(self.searchPrice)*self.stockCount),2)
+
         self.label_number.configure(text=f"Shares: {self.stockCount}")
+        self.button_minus.configure(fg_color="blue")
+        
+        #Format market value label of searched stock symbol * number of shares being requested (total value)
+        marketValue = round((float(self.searchPrice)*self.stockCount),2)
         marketValue = "{:.2f}".format(marketValue)
         self.value_number.configure(text=f"Market Value: ${marketValue}")
-        self.button_minus.configure(fg_color="blue")
 
 
+    
+    #Stock count button minus click handling
+    
     def minus_button_event(self):
+        #Preventing negative sell count
         if self.stockCount >=1:
             if self.stockCount <= 1:
                 self.button_minus.configure(fg_color="grey")
@@ -781,33 +821,42 @@ class App(customtkinter.CTk):
             self.value_number.configure(text=f"Market Value: ${marketValue}")
 
 
-
+    #Appearence mode button switch handling
+    
     def change_appearance_mode_event(self, new_appearance_mode: str):
         customtkinter.set_appearance_mode(new_appearance_mode)
 
 
+    #Buy button press handling
     
     def buy_button_event(self):
         buyingPleft = float(self.buyingP)
         buyingPleft = (buyingPleft - (float(self.searchPrice) * self.stockCount))
+        #Double checking to make sure the user has proper funds if GUI fails
         if buyingPleft > 0:
             buyStock(mycursor,self.ticker_symbol,self.user_ID,self.stockCount)
+            #Resetting Values then updating
             self.stockCount = 0
             self.label_number.configure(text=f"Shares: {self.stockCount}")
             self.update_positions()
         else:
+            #Error Handling
             messagebox.showerror("Error", "Insufficient Funds.")
         
 
+    #Sell button event handling
     
     def sell_button_event(self):
         sellStock(mycursor,self.ticker_symbol,self.user_ID,self.stockCount)
         self.stockCount = 0
         self.label_number.configure(text=f"Shares: {self.stockCount}")
+        #SQL Trigger will prevent overselling of a stock
+
+        #Updating all values
         self.update_positions()
     
 
-
+#Launch App
 if __name__ == "__main__":
     app = App()
     app.mainloop()
