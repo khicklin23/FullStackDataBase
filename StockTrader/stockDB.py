@@ -116,7 +116,7 @@ def createTables(cursor):
             )
         """)
     
-
+#createTables(mycursor
 
 #Insert data from .csv into the MySql Database
 
@@ -609,7 +609,7 @@ class App(customtkinter.CTk):
                 #Constructing / Formatting the stock explanation
                 explanation = f"({self.ticker_symbol.upper()}): Price: ${currPrice[0]}\n\n{company_name}  is a {industry} company in the {sector} sector."
                 explanation += f" It was founded in {founded_year} in {location}."
-                explanation += f" The Central Index Key for {company_name} is {cik}, It was initially added to the S&P in {sp500}.\n\n"
+                explanation += f" The Central Index Key for {company_name} is {cik}, It was initially added to the S&P 500 in {sp500}.\n\n"
                 
             self.textbox.insert("0.0", explanation)
 
@@ -694,7 +694,7 @@ class App(customtkinter.CTk):
         insertUser(mycursor,userID,str(username),str(password))
 
         #Automatically prompt for login after successfull login
-        self.login_button_click(self)
+        self.login_button_click()
                         
 
     #Function to update all stock and database data
@@ -783,7 +783,7 @@ class App(customtkinter.CTk):
 
         #Prevent overbuying
         if buyingPleft < 0:
-            self.stockCount--
+            self.stockCount-=1
             return #break
         #Format Buying Power Left Label
         buyingPleft = "{:.2f}".format(buyingPleft)
@@ -860,7 +860,3 @@ class App(customtkinter.CTk):
 if __name__ == "__main__":
     app = App()
     app.mainloop()
-
-
-
-
