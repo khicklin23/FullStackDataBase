@@ -270,34 +270,32 @@ def buyStock(cursor,symbol,userID,shares):
 
 def sellStock(cursor, symbol, userID, shares):
     try:
-        # Get the current date and time
+        #Get current date and time
         time = datetime.datetime.now()
 
-        # Format it to sql standards
+        #Format it to sql standards
         formatTime = time.strftime('%Y-%m-%d %H:%M:%S')
 
         price = get_price(symbol)
         value = float(price[0])
         total = round((value * shares), 2)
         
-        # Check if there is an existing position for the user and symbol
         cursor.execute("SELECT shares, POS FROM positions WHERE symbol = %s AND userID = %s", (symbol, userID))
         existing_position = cursor.fetchone()
         
         if existing_position:
-            # Update existing position
             existing_shares, existing_pos = existing_position
             new_shares = existing_shares + shares
-            # Calculate the new average purchase price
+
             new_pos = ((existing_pos * existing_shares) + (value * shares)) / new_shares
             new_shares = existing_position[0] - shares
             cursor.execute("UPDATE positions SET shares = %s, POS = %s WHERE symbol = %s AND userID = %s", (new_shares, new_pos, symbol, userID))
         else:
-            # Insert new position
+            #Insert new position
             cursor.execute("INSERT INTO positions (symbol, POS, userID, shares) VALUES (%s, %s, %s, %s)", (symbol, value, userID, -shares))
         
         
-        # Insert transaction
+        #Insert transaction
         sql = "INSERT INTO transactions (symbol, price, userID, shares, value, sale, datetime) VALUES (%s, %s, %s, %s, %s, %s, %s)"
         val = (symbol, value, userID, shares, total, "SELL", formatTime)
         cursor.execute(sql, val)
@@ -335,9 +333,9 @@ buyStock(mycursor,'aapl',15861,6)
 sellStock(mycursor,'aapl',15861,3)
 """
 
+#Function to get total value of user account
 
 def totalValue(cursor,userID):
-    #Returns buying power + posistion value
     sql = "SELECT amount, buying_power FROM users WHERE userID = %s"
     cursor.execute(sql,(userID,))
     items = cursor.fetchall()
@@ -347,11 +345,11 @@ def totalValue(cursor,userID):
         return total
     else:
         print("Invalid userID")
-
         return None
-    
+
 
 #Function for checking user PnL stats and updating database information
+
 def profitNLoss(cursor,userID):
     #Chart = posID, symbol, POS, shares, userID
     #Grabs format ROW = (214, 'aapl', 183.38, 8, 70900)
@@ -366,56 +364,67 @@ def profitNLoss(cursor,userID):
         symbol = str(row[1])
         POS = float(row[2])
         shares = int(row[3])
-        priceList = get_price(str(symbol))
-        #Gets current stock price
-        currentPrice = float(priceList[0])
-        currTotal = (currentPrice*shares)
-
-        newAccountAmount += (currTotal)
         
-
+        priceList = get_price(str(symbol))
+        currentPrice = float(priceList[0])
+        #Gets current stock price ^ 
+        currTotal = (currentPrice*shares) #Current value of shares owned
+        newAccountAmount += (currTotal)
+    
         #Gets individual stock PnL
         stockPNL = round(currTotal-(POS*shares),2)
+        
         #Gets stock percent from POS
         percent_change = round(((currentPrice - POS) / POS) * 100, 2)
+
+        #Format Handling
         if stockPNL >= 0:
             profitNLoss.append(f"{symbol.upper()}:  $+{stockPNL}  ({percent_change}%)")
         else:
             profitNLoss.append(f"{symbol.upper()}:  ${stockPNL}  ({percent_change}%)")
+            
         total+=stockPNL
-    
+
+    #Update user markt value
     sql = "UPDATE Users SET amount = %s WHERE userID = %s"
     cursor.execute(sql, (newAccountAmount, userID))
     mydb.commit()
 
-
+    #Return per-position PnL and Total PnL
     return(profitNLoss,total)
 
 
 
-#Start Of GUI Code:
+"""
+////////////////////////////////////////
+
+Start Of GUI Code:
+
+////////////////////////////////////////
+"""
 
 
 
-customtkinter.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
-customtkinter.set_default_color_theme("dark-blue")  # Themes: "blue" (standard), "green", "dark-blue"
+customtkinter.set_appearance_mode("System")
+customtkinter.set_default_color_theme("dark-blue")  #Set Default Theme
 
 
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        # configure window
+        
+        #Config window
         self.title("Database Project - Paper Trading")
         self.geometry(f"{1300}x{650}")
 
-        # configure grid layout (4x4)
+        #Config grid layout (4x4)
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
         self.grid_rowconfigure((0, 1, 2), weight=0)
 
 
 
-        # create sidebar frame with widgets
+        #Create sidebar frame
 
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=8, sticky="nsew")
@@ -430,7 +439,7 @@ class App(customtkinter.CTk):
 
 
 
-        # create main entry and button
+        #Create search box and enter button
 
         self.entry = customtkinter.CTkEntry(self, placeholder_text="Enter a Stock Ticker Symbol")
         self.entry.grid(row=3, column=1, columnspan=2, padx=(20, 0), pady=(20, 20), sticky="nsew")
@@ -440,20 +449,20 @@ class App(customtkinter.CTk):
         self.main_button_1.grid(row=3, column=3, padx=(20, 20), pady=(20, 20), sticky="nsew")
 
 
-        # create textbox
+        #Create textbox for stock information
 
         self.textbox = customtkinter.CTkTextbox(self, width=250,font=customtkinter.CTkFont(size=20, weight="bold"))
         self.textbox.grid(row=0, column=1, padx=(20, 0), pady=(20, 0), sticky="nsew")
 
 
 
-        # create tabview
+        #Create tabview for sector data and open position PnL
 
         self.tabview = customtkinter.CTkTabview(self, width=250)
         self.tabview.grid(row=0, column=2, padx=(20, 0), pady=(20, 0), sticky="nsew")
         self.tabview.add("All Sectors")
         self.tabview.add("Open P&L")
-        self.tabview.tab("All Sectors").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
+        self.tabview.tab("All Sectors").grid_columnconfigure(0, weight=1) 
         self.tabview.tab("Open P&L").grid_columnconfigure(0, weight=1)
 
         
@@ -464,6 +473,7 @@ class App(customtkinter.CTk):
         self.sector_label_all = customtkinter.CTkLabel(self.tabview.tab("All Sectors"), text="Insert sectors here")
         self.sector_label_all.grid(row=0, column=0, padx=20, pady=20)
 
+        #Initialize sector web scraping and set to variable
         Sector_Update = checkSectors()
 
         myStr =''
@@ -485,15 +495,15 @@ class App(customtkinter.CTk):
                     myStr += f"\n{sector}: {percent}%" + "   "
                     self.sector_label_all.configure(text=myStr, font=customtkinter.CTkFont(size=13, weight="bold"))
 
-        
+        #Use previous variable for text entry of Sector status's
         self.sector_label_all.configure(text=f"{myStr}")
 
         self.open_PnL_Label = customtkinter.CTkLabel(self.tabview.tab("Open P&L"), text="Login To View Your Open P&L")
         self.open_PnL_Label.grid(row=0, column=0, padx=20, pady=20)
 
 
-        # Login Frame
-
+        #Login Buttons Frame
+        
         self.login = False
         
         self.login_frame = customtkinter.CTkScrollableFrame(self, label_text= "Login / Sign Up")
@@ -514,7 +524,7 @@ class App(customtkinter.CTk):
         self.profit_and_loss_frame = customtkinter.CTkTabview(self)
         self.profit_and_loss_frame.add("Open P&L")
         self.profit_and_loss_frame.add("Life Time Account P&L")
-        self.profit_and_loss_frame.tab("Life Time Account P&L").grid_columnconfigure(0, weight=1)  # configure grid of individual tabs
+        self.profit_and_loss_frame.tab("Life Time Account P&L").grid_columnconfigure(0, weight=1) 
         self.profit_and_loss_frame.tab("Open P&L").grid_columnconfigure(0, weight=1)
 
         self.profit_and_loss_frame.grid(row=1, column=1, padx=(20, 0), pady=(20, 0), sticky="nsew")
@@ -527,19 +537,6 @@ class App(customtkinter.CTk):
         self.accountPNL_life.grid(row=0, column=0, padx=20, pady=20)
         
         
-        
-        
-
-
-
-     
-
-        """
-        self.progressbar_1 = customtkinter.CTkProgressBar(self.profit_and_loss_frame)
-        self.progressbar_1.grid(row=0, column=0, padx=(20, 10), pady=(10, 10), sticky="ew")
-        self.progressbar_1.configure(mode="indeterminnate")
-        self.progressbar_1.start()"""
-
 
 
         #Account Info
@@ -565,34 +562,42 @@ class App(customtkinter.CTk):
         self.positions_label = customtkinter.CTkLabel(master=self.position_frame, text="Login to View Your Positions",font=customtkinter.CTkFont(size=12, weight="normal"))
         self.positions_label.grid(row=0, column=0, padx=(0,150), pady=20)
 
-
-
- 
-        
-
-
-
-
+        #Default Stock Info status + Default Appearence Mode
         self.appearance_mode_optionemenu.set("Dark")
         self.textbox.insert("0.0", "Stock Info:\n\n" + "Search a stock in the search bar below to find out its information!")
 
+    
+        """
+        ////////////////////////////////////
+        End of Default Window Initialization
+        ////////////////////////////////////
+        """
+
+
+
+    #Function to handle input from the search bar and retrieve stock data
+    
     def search_button_event(self): 
-        
         # Retrieve the text entered in the entry widget
         search_text = self.entry.get()
-        
         cursor = mydb.cursor()
         cursor.execute("SELECT * FROM Stocks WHERE symbol = %s", (search_text,))
         items = cursor.fetchall()
+        
         self.textbox.delete("1.0", "end")
         self.ticker_symbol = search_text
+        
+        #Use bot to scrape the live stock data
         currPrice = get_price(self.ticker_symbol)
         self.searchPrice = currPrice[0]
+        
         if not items:
+            #If the stock isnt in the stocks database, still insert symbol and live price
             self.textbox.insert("0.0",f"({self.ticker_symbol.upper()}): Price: ${currPrice[0]}\n\nThis Stock Is Not In The S&P 500.")
             
         else:    
             for row in items:
+                #Code for displaying the stock data in the stock information textbox
                 self.ticker_symbol = row[0]
                 company_name = row[1]
                 sector = row[2]
@@ -601,21 +606,23 @@ class App(customtkinter.CTk):
                 sp500 = row[5]
                 cik = row[6]
                 founded_year = row[7]
-                # Constructing the explanation
+                #Constructing / Formatting the stock explanation
                 explanation = f"({self.ticker_symbol.upper()}): Price: ${currPrice[0]}\n\n{company_name}  is a {industry} company in the {sector} sector."
                 explanation += f" It was founded in {founded_year} in {location}."
                 explanation += f" The Central Index Key for {company_name} is {cik}, It was initially added to the S&P in {sp500}.\n\n"
+                
             self.textbox.insert("0.0", explanation)
 
+        #Function is ran if the user is logged in as an account
         if self.login:
             
-            #Buy and sell buttons
+            #Buy and sell button format
             self.sidebar_button_1 = customtkinter.CTkButton(self.sidebar_frame, text="Buy", command=self.buy_button_event, bg_color='transparent', fg_color='green')
             self.sidebar_button_1.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
             self.sidebar_button_2 = customtkinter.CTkButton(self.sidebar_frame, text="Sell", command=self.sell_button_event, bg_color='transparent', fg_color='red')
             self.sidebar_button_2.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
-            # Plus and Minus Buttons
+            # Plus and Minus Button format
             self.button_plus = customtkinter.CTkButton(self.sidebar_frame, text="+", command=self.plus_button_event, bg_color='transparent', fg_color='blue')
             self.button_plus.grid(row=3, column=0, padx=20, pady=15, sticky="ew")
             self.button_minus = customtkinter.CTkButton(self.sidebar_frame, text="-", command=self.minus_button_event, bg_color='transparent', fg_color='grey')
@@ -624,6 +631,7 @@ class App(customtkinter.CTk):
             self.label_number = customtkinter.CTkLabel(self.sidebar_frame, text=f"Shares: {self.stockCount}", font=customtkinter.CTkFont(size=14, weight="bold"))
             self.label_number.grid(row=5, column=0, padx=20, pady=5, sticky="ew")
 
+            #Format for labels under side pannel buttons
             self.MarketValue = 0
             self.value_number = customtkinter.CTkLabel(self.sidebar_frame, text=f"Market Value: ${self.MarketValue}", font=customtkinter.CTkFont(size=14, weight="bold"))
             self.value_number.grid(row=6, column=0, padx=20, pady=5, sticky="ew")
@@ -771,13 +779,6 @@ class App(customtkinter.CTk):
             self.label_number.configure(text=f"Shares: {self.stockCount}")
             marketValue = "{:.2f}".format(marketValue)
             self.value_number.configure(text=f"Market Value: ${marketValue}")
-           
-           
-
-
-
-
-
 
 
 
