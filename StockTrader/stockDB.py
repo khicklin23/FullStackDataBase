@@ -408,6 +408,7 @@ Start Of GUI Code:
 customtkinter.set_appearance_mode("System")
 customtkinter.set_default_color_theme("dark-blue")  #Set Default Theme
 
+#Class Initialization for GUI
 
 class App(customtkinter.CTk):
     def __init__(self):
@@ -476,6 +477,8 @@ class App(customtkinter.CTk):
         #Initialize sector web scraping and set to variable
         Sector_Update = checkSectors()
 
+        #Set label to current sector values
+        
         myStr =''
         for i, (sector, percent) in enumerate(Sector_Update):
             if float(percent) >= 0:
